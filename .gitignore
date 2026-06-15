@@ -38,11 +38,6 @@ venv/
 __pycache__/
 *.py[cod]
 
-# --- Generated simulation results & plots ---
-results/
-*_plots/
-*.ods
-
 # Temporary sweep macros created by run_sweep.sh
 sweep_*.mac
 
