@@ -1,0 +1,3 @@
+# Initialise the kernel and then set up visualisation.
+/run/initialize
+/control/execute macros/vis.mac

@@ -1,0 +1,24 @@
+# Visualisation setup.
+# Open an OpenGL viewer (stored-mode).
+/vis/open OGL 600x600-0+0
+
+# Camera.
+/vis/viewer/set/viewpointThetaPhi 70 20
+/vis/viewer/set/style surface
+/vis/viewer/set/autoRefresh true
+
+# Draw the geometry.
+/vis/drawVolume
+
+# Draw trajectories, accumulating across events of a run.
+/vis/scene/add/trajectories smooth
+/vis/scene/endOfEventAction accumulate
+
+# Colour trajectories by particle type.
+/vis/modeling/trajectories/create/drawByParticleID
+/vis/modeling/trajectories/drawByParticleID-0/set proton red
+/vis/modeling/trajectories/drawByParticleID-0/set opticalphoton green
+
+# Show axes at the origin (10 mm).
+/vis/scene/add/axes 0 0 0 10 mm
+/vis/scene/add/scale 10 mm z 1 0 0 manual 0 0 0 mm
