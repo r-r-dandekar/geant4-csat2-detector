@@ -4,6 +4,7 @@
 #include "ActionInitialization.hh"
 #include "PrimaryGeneratorAction.hh"
 #include "RunAction.hh"
+#include "EventAction.hh"
 #include "SteppingAction.hh"
 
 //....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
@@ -19,6 +20,10 @@ void ActionInitialization::Build() const {
     auto* runAction = new RunAction;
     SetUserAction(runAction);
 
-    // SteppingAction feeds the tallies owned by this thread's RunAction.
-    SetUserAction(new SteppingAction(runAction));
+    // EventAction handles per-proton time logging (no-op unless timelog= is set).
+    auto* eventAction = new EventAction;
+    SetUserAction(eventAction);
+
+    // SteppingAction feeds the RunAction tallies and the EventAction time log.
+    SetUserAction(new SteppingAction(runAction, eventAction));
 }

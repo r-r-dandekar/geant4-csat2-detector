@@ -13,17 +13,19 @@
 #include "globals.hh"
 
 class RunAction;
+class EventAction;
 class G4OpBoundaryProcess;
 
 class SteppingAction : public G4UserSteppingAction {
   public:
-    explicit SteppingAction(RunAction* runAction);
+    SteppingAction(RunAction* runAction, EventAction* eventAction);
     ~SteppingAction() override;
 
     void UserSteppingAction(const G4Step*) override;
 
   private:
-    RunAction* fRunAction = nullptr;
+    RunAction*   fRunAction = nullptr;
+    EventAction* fEventAction = nullptr;
     G4OpBoundaryProcess* fBoundary = nullptr;  // cached optical boundary process
 };
 

@@ -3,6 +3,7 @@
 
 #include "SteppingAction.hh"
 #include "RunAction.hh"
+#include "EventAction.hh"
 #include "Scoring.hh"
 
 #include "G4Step.hh"
@@ -15,11 +16,12 @@
 #include "G4ProcessManager.hh"
 #include "G4ProcessVector.hh"
 #include "G4OpBoundaryProcess.hh"
+#include "G4SystemOfUnits.hh"
 
 //....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
 
-SteppingAction::SteppingAction(RunAction* runAction)
-    : fRunAction(runAction) {}
+SteppingAction::SteppingAction(RunAction* runAction, EventAction* eventAction)
+    : fRunAction(runAction), fEventAction(eventAction) {}
 
 SteppingAction::~SteppingAction() = default;
 
@@ -74,10 +76,53 @@ void SteppingAction::UserSteppingAction(const G4Step* step) {
         }
         if (fBoundary && fBoundary->GetStatus() == Detection) {
             fRunAction->AddPhotodiodeDetected(1.0);
+            if (fEventAction && fEventAction->Logging()) {
+                fEventAction->RecordPhoton(track->GetGlobalTime() / ns,
+                                           track->GetKineticEnergy() / MeV);
+            }
         }
     }
 
-    // (4) Fate of the primary proton.
+    // (4) Time-logging of proton interactions (only when timelog is enabled).
+    if (isPrimary && !isOptical && fEventAction && fEventAction->Logging()) {
+        G4StepPoint* pre  = step->GetPreStepPoint();
+        G4StepPoint* post = step->GetPostStepPoint();
+
+        // Entry into CD / CsI / ACD: first step inside the volume starts on a
+        // geometry boundary; the pre-step point holds the entry time/energy.
+        if (pre->GetStepStatus() == fGeomBoundary) {
+            const G4double t  = pre->GetGlobalTime() / ns;
+            const G4double ke = pre->GetKineticEnergy() / MeV;
+            if (region == score::kSiCD && !fEventAction->EnteredCD())
+                fEventAction->RecordProtonEnterCD(t, ke);
+            else if (region == score::kCsI && !fEventAction->EnteredCsI())
+                fEventAction->RecordProtonEnterCsI(t, ke);
+            else if (region == score::kSiACD && !fEventAction->EnteredACD())
+                fEventAction->RecordProtonEnterACD(t, ke);
+        }
+
+        // Leaving the CsI: either it crosses out, or it stops (ranges out)
+        // inside -- log whichever happens first, once.
+        if (region == score::kCsI && !fEventAction->LeftCsI()) {
+            if (track->GetTrackStatus() == fStopAndKill &&
+                track->GetKineticEnergy() <= 0.0) {
+                fEventAction->RecordProtonLeaveCsI(post->GetGlobalTime() / ns,
+                                                   0.0, /*stopped=*/true);
+            } else if (post->GetStepStatus() == fGeomBoundary) {
+                auto* nextVol = post->GetPhysicalVolume();
+                const score::Region nextRegion =
+                    nextVol ? score::RegionFromVolume(
+                                  nextVol->GetLogicalVolume()->GetName())
+                            : score::kNumRegions;
+                if (nextRegion != score::kCsI)
+                    fEventAction->RecordProtonLeaveCsI(
+                        post->GetGlobalTime() / ns,
+                        post->GetKineticEnergy() / MeV, /*stopped=*/false);
+            }
+        }
+    }
+
+    // (5) Fate of the primary proton.
     if (isPrimary && !isOptical) {
         const G4StepStatus postStatus =
             step->GetPostStepPoint()->GetStepStatus();
@@ -93,7 +138,7 @@ void SteppingAction::UserSteppingAction(const G4Step* step) {
             fRunAction->AddPrimaryStopped(region);
         }
     }
-    // (5) Secondary (non-optical) particles that stop, tracked separately.
+    // (6) Secondary (non-optical) particles that stop, tracked separately.
     else if (!isPrimary && !isOptical) {
         if (track->GetTrackStatus() == fStopAndKill &&
             track->GetKineticEnergy() <= 0.0 &&

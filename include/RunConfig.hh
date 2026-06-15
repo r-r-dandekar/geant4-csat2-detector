@@ -37,6 +37,16 @@ inline G4String gResultsFile = "";
 // SCINTILLATION photon tallies (not Cerenkov) by this factor.
 inline G4double gLightYieldDivisor = 1000.0;
 
+// Per-proton time-logging (decisions 28-32), set via `timelog=<dir>`. Empty =
+// disabled. When set, each event writes its own detail CSV into <dir> plus a
+// per-run index CSV. Independent of gResultsFile (existing output unchanged).
+inline G4String gTimelogDir = "";
+
+// Run tag used in time-log filenames (decision 31), set via `timetag=<tag>`.
+// If left empty while timelog is enabled, main() fills it with a launch
+// timestamp so repeated invocations don't collide.
+inline G4String gTimeTag = "";
+
 }  // namespace cfg
 
 #endif

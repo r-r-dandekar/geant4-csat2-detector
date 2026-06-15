@@ -55,6 +55,8 @@ Arguments are conventionally given in this order: `energy=`, `ydiv=`, `mode=`,
 | `ydiv=<N>`           | Light-yield divisor: divides the CsI(Tl) scintillation yield to keep the optical-photon count tractable (higher = fewer photons = faster). Does not affect energy deposition. | 1000 |
 | `mode=ideal\|realistic` | Beam mode. `ideal`: pencil beam, normal incidence at the centre. `realistic`: uniform over the 10×10 mm face with cosine-law (Lambertian) incidence, modelling an isotropic external flux. | ideal |
 | `results_file=<path>`| Append a one-row run summary to this CSV (the program writes the header if the file is new). Omit for console-only output. | — (none) |
+| `timelog=<dir>`      | Enable per-proton time logging into `<dir>` (see below). Independent of `results_file`. | — (off) |
+| `timetag=<tag>`      | Run tag used in time-log filenames. Defaults to a launch timestamp.     | timestamp |
 | `<file>.mac`         | Geant4 macro to execute (batch mode)                                    | —        |
 
 Example: `./dsim energy=100 ydiv=1000 mode=ideal results_file=results/run.csv macros/run.mac`
@@ -69,6 +71,51 @@ bash ../scripts/run_sweep.sh results/sweep.csv [nevents] [ydiv] [mode]
 ```
 
 e.g. `bash ../scripts/run_sweep.sh results/sweep.csv 500 1000 ideal`.
+
+## Per-proton time logging
+
+With `timelog=<dir>`, every proton (event) writes its own detail CSV recording
+*when* it interacts with the detector and *when* each scintillation photon is
+detected:
+
+```bash
+./dsim energy=100 timelog=timelogs macros/run.mac     # beamOn N -> N detail files
+```
+
+Each detail file `evt_E<energy>MeV_<runtag>_id<eventID>.csv` has one row per
+interaction (sorted by time):
+
+```
+# proton_energy_MeV=100, event_id=7, run_tag=20260615_142233
+time_ns,interaction,particle,energy_MeV
+0.512,enter_CD,proton,99.81
+0.673,enter_CsI,proton,98.90
+1.21,photon_at_photodiode,opticalphoton,2.95e-06
+...
+```
+
+`interaction` ∈ {`enter_CD`, `enter_CsI`, `exit_CsI`/`stop_CsI`, `enter_ACD`,
+`photon_at_photodiode`}. The `<runtag>` defaults to a launch timestamp (override
+with `timetag=`) so repeated runs into the same folder never collide.
+
+A per-run **aggregated index** `index_<runtag>.csv` is also written, one row per
+proton, carrying the proton's interaction times/energies and entry flags (but
+**not** the photon detections — those stay in the detail files):
+
+```
+event_id,file,energy_MeV,entered_CD,entered_CsI,entered_ACD,stopped_in_CsI,
+t_enter_CD_ns,ke_enter_CD_MeV,t_enter_CsI_ns,ke_enter_CsI_MeV,
+t_leave_CsI_ns,ke_leave_CsI_MeV,t_enter_ACD_ns,ke_enter_ACD_MeV
+```
+
+> For physically correct photon counts/timing in the detail files, run with
+> `ydiv=1` (the divisor reduces the simulated photon count).
+
+The sweep script can enable this too (5th argument), using a per-energy run tag:
+
+```bash
+bash ../scripts/run_sweep.sh results/sweep.csv 500 1000 ideal timelogs
+```
 
 ## Plotting
 

@@ -22,6 +22,8 @@
 #include "G4SystemOfUnits.hh"
 
 #include <string>
+#include <ctime>
+#include <filesystem>
 
 int main(int argc, char** argv) {
     G4String macroFile;
@@ -46,9 +48,28 @@ int main(int argc, char** argv) {
         } else if (arg.rfind("results_file=", 0) == 0) {
             cfg::gResultsFile = arg.substr(13);
             G4cout << "Results CSV: " << cfg::gResultsFile << G4endl;
+        } else if (arg.rfind("timelog=", 0) == 0) {
+            cfg::gTimelogDir = arg.substr(8);
+        } else if (arg.rfind("timetag=", 0) == 0) {
+            cfg::gTimeTag = arg.substr(8);
         } else if (arg.find(".mac") != std::string::npos) {
             macroFile = arg;
         }
+    }
+
+    // Time-logging setup: default the run tag to a launch timestamp (so
+    // repeated invocations don't collide) and create the output directory.
+    if (!cfg::gTimelogDir.empty()) {
+        if (cfg::gTimeTag.empty()) {
+            char buf[32];
+            std::time_t now = std::time(nullptr);
+            std::strftime(buf, sizeof buf, "%Y%m%d_%H%M%S", std::localtime(&now));
+            cfg::gTimeTag = buf;
+        }
+        std::error_code ec;
+        std::filesystem::create_directories(cfg::gTimelogDir.c_str(), ec);
+        G4cout << "Time-logging to '" << cfg::gTimelogDir
+               << "' (run tag " << cfg::gTimeTag << ")" << G4endl;
     }
 
     // Interactive UI only when no macro is supplied.

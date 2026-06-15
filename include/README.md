@@ -9,6 +9,7 @@ Class headers and shared definitions.
 | `DetectorConstruction.hh`   | Builds geometry + materials + optical properties/surfaces.              |
 | `PrimaryGeneratorAction.hh` | The proton source (ideal pencil or realistic cosine-law beam).          |
 | `RunAction.hh`              | Owns the per-run tallies (accumulables) and writes the console summary + CSV row. |
-| `SteppingAction.hh`         | Per-step classification that fills the tallies.                         |
+| `EventAction.hh`            | Per-proton time logging (no-op unless `timelog=` is set): collects interactions and writes the per-event detail CSV + per-run index row. |
+| `SteppingAction.hh`         | Per-step classification that fills the tallies (and the time log).      |
 | `Scoring.hh`                | Scoring `Region` enum + volume-name → region mapping.                   |
 | `ActionInitialization.hh`   | Registers the user actions (per thread).                                |

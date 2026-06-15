@@ -5,19 +5,22 @@
 # this script only has to start a fresh file and loop.
 #
 # Run from the build directory (where the `dsim` executable lives):
-#   bash ../scripts/run_sweep.sh results/sweep.csv [nevents] [ydiv] [mode]
+#   bash ../scripts/run_sweep.sh results/sweep.csv [nevents] [ydiv] [mode] [timelog_dir]
 #
-#   <output.csv>  required - path to the results CSV
-#   [nevents]     protons per energy (default 500)
-#   [ydiv]        light-yield divisor (default 1000)
-#   [mode]        ideal | realistic (default ideal)
+#   <output.csv>   required - path to the aggregate results CSV
+#   [nevents]      protons per energy (default 500)
+#   [ydiv]         light-yield divisor (default 1000)
+#   [mode]         ideal | realistic (default ideal)
+#   [timelog_dir]  if given, also write per-proton time-log files into this
+#                  folder, using a per-energy run tag (one index per energy)
 
 set -e
 
-OUT=${1:?Usage: run_sweep.sh <output.csv> [nevents] [ydiv] [mode]}
+OUT=${1:?Usage: run_sweep.sh <output.csv> [nevents] [ydiv] [mode] [timelog_dir]}
 NEVENTS=${2:-500}
 YDIV=${3:-1000}
 MODE=${4:-ideal}
+TIMELOG_DIR=${5:-}
 
 if [ ! -x ./dsim ]; then
     echo "Error: ./dsim not found. Run this from the build directory." >&2
@@ -40,7 +43,13 @@ EOF
 
 for E in $ENERGIES; do
     echo "  energy=${E} MeV ..."
-    ./dsim energy="$E" ydiv="$YDIV" mode="$MODE" results_file="$OUT" "$MAC" > /dev/null
+    if [ -n "$TIMELOG_DIR" ]; then
+        # Per-energy run tag so each energy gets its own index file.
+        ./dsim energy="$E" ydiv="$YDIV" mode="$MODE" results_file="$OUT" \
+               timelog="$TIMELOG_DIR" timetag="E${E}MeV" "$MAC" > /dev/null
+    else
+        ./dsim energy="$E" ydiv="$YDIV" mode="$MODE" results_file="$OUT" "$MAC" > /dev/null
+    fi
 done
 
 rm -f "$MAC"
