@@ -1,10 +1,33 @@
-# --- Build output (CMake) ---
+# --- Build output ---
+# Out-of-source build directories (any name/level)
 build/
-# In-source CMake artifacts (in case cmake is ever run outside build/)
+build*/
+cmake-build-*/
+
+# In-source CMake artifacts (in case cmake is ever run outside a build dir)
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
+CTestTestfile.cmake
+CPack*.cmake
+install_manifest.txt
+CMakeUserPresets.json
+compile_commands.json
+Testing/
+_deps/
 Makefile
+
+# Compiled objects, libraries and executables
+*.o
+*.obj
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.lib
+*.exe
+*.out
 dsim
 
 # --- Python virtual environment ---
