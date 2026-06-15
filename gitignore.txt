@@ -1,0 +1,34 @@
+# --- Build output (CMake) ---
+build/
+# In-source CMake artifacts (in case cmake is ever run outside build/)
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+dsim
+
+# --- Python virtual environment ---
+venv/
+.venv/
+
+# --- Python caches ---
+__pycache__/
+*.py[cod]
+
+# --- Generated simulation results & plots ---
+results/
+*_plots/
+*.ods
+
+# Temporary sweep macros created by run_sweep.sh
+sweep_*.mac
+
+# --- Editor / IDE ---
+.vscode/
+.idea/
+*.swp
+*~
+
+# --- OS ---
+.DS_Store
+Thumbs.db
