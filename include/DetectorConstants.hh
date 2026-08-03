@@ -45,10 +45,10 @@ constexpr G4double kCrossSectionY = 1.0 * cm;
 // Longitudinal (z) thicknesses of each element, in beam order.
 // ---------------------------------------------------------------------------
 constexpr G4double kAluminiumLength          = 0.065 * cm;  // window: stops protons < ~10 MeV
-constexpr G4double kSiliconCoincidenceLength  = 0.03 * cm;  // Si C.D. -- resolved to 0.03 cm (decision 2)
+constexpr G4double kSiliconCoincidenceLength  = 0.178 * cm;  // Si C.D.
 constexpr G4double kEmptyPassageLength        = 5.0  * cm;  // vacuum drift gap
 constexpr G4double kCsILength                 = 3.3  * cm;  // CsI(Tl) scintillator
-constexpr G4double kSiliconAnticoincidenceLength = 0.03 * cm;  // Si A.C.D.
+constexpr G4double kSiliconAnticoincidenceLength = 0.178 * cm;  // Si A.C.D.
 constexpr G4double kPhotodiodeLength          = 0.03 * cm;  // photodiode (300 um)
 
 // ---------------------------------------------------------------------------
