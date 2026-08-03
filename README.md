@@ -94,19 +94,32 @@ time_ns,interaction,particle,energy_MeV
 ...
 ```
 
-`interaction` ∈ {`enter_CD`, `enter_CsI`, `exit_CsI`/`stop_CsI`, `enter_ACD`,
-`photon_at_photodiode`}. The `<runtag>` defaults to a launch timestamp (override
-with `timetag=`) so repeated runs into the same folder never collide.
+`interaction` ∈ {`enter_CD`, `exit_CD`/`stop_CD`, `enter_CsI`, `exit_CsI`/`stop_CsI`,
+`enter_ACD`, `exit_ACD`/`stop_ACD`, `enter_PD`, `exit_PD`/`stop_PD`,
+`photon_at_photodiode`}. `enter_PD`/`exit_PD`/`stop_PD` are the proton's own
+direct passage through the photodiode silicon — distinct from
+`photon_at_photodiode`, which is an optical-photon detection, not a proton
+interaction. The `<runtag>` defaults to a launch timestamp (override with
+`timetag=`) so repeated runs into the same folder never collide.
 
 A per-run **aggregated index** `index_<runtag>.csv` is also written, one row per
-proton, carrying the proton's interaction times/energies and entry flags (but
-**not** the photon detections — those stay in the detail files):
+proton, carrying the proton's interaction times/energies and entry/exit flags
+(but **not** the photon detections — those stay in the detail files):
 
 ```
-event_id,file,energy_MeV,entered_CD,entered_CsI,entered_ACD,stopped_in_CsI,
-t_enter_CD_ns,ke_enter_CD_MeV,t_enter_CsI_ns,ke_enter_CsI_MeV,
-t_leave_CsI_ns,ke_leave_CsI_MeV,t_enter_ACD_ns,ke_enter_ACD_MeV
+event_id,file,energy_MeV,
+entered_CD,stopped_in_CD,entered_CsI,stopped_in_CsI,entered_ACD,stopped_in_ACD,
+entered_PD,stopped_in_PD,
+t_enter_CD_ns,ke_enter_CD_MeV,t_leave_CD_ns,ke_leave_CD_MeV,
+t_enter_CsI_ns,ke_enter_CsI_MeV,t_leave_CsI_ns,ke_leave_CsI_MeV,
+t_enter_ACD_ns,ke_enter_ACD_MeV,t_leave_ACD_ns,ke_leave_ACD_MeV,
+t_enter_PD_ns,ke_enter_PD_MeV,t_leave_PD_ns,ke_leave_PD_MeV
 ```
+
+`t_leave_*_ns`/`ke_leave_*_MeV` are blank if the proton never entered that
+element. `ke_leave` is `0` when `stopped_in_*` is `1` (the proton ranged out
+inside), otherwise it is the exit kinetic energy. Energy deposited in an
+element is `ke_enter_*_MeV - ke_leave_*_MeV` in both cases.
 
 > For physically correct photon counts/timing in the detail files, run with
 > `ydiv=1` (the divisor reduces the simulated photon count).

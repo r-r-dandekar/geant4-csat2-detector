@@ -1,0 +1,1 @@
+These scripts are meant to be placed under build/results or similar

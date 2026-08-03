@@ -31,14 +31,23 @@ class EventAction : public G4UserEventAction {
     void RecordProtonEnterCD(G4double t_ns, G4double ke_MeV);
     void RecordProtonEnterCsI(G4double t_ns, G4double ke_MeV);
     void RecordProtonEnterACD(G4double t_ns, G4double ke_MeV);
+    void RecordProtonLeaveCD(G4double t_ns, G4double ke_MeV, bool stopped);
     void RecordProtonLeaveCsI(G4double t_ns, G4double ke_MeV, bool stopped);
+    void RecordProtonLeaveACD(G4double t_ns, G4double ke_MeV, bool stopped);
+    void RecordProtonEnterPD(G4double t_ns, G4double ke_MeV);
+    void RecordProtonLeavePD(G4double t_ns, G4double ke_MeV, bool stopped);
     void RecordPhoton(G4double t_ns, G4double e_MeV);
 
-    // First-entry guards (also serve as the index "entered_*" flags).
+    // First-entry / first-exit guards (also serve as the index
+    // "entered_*"/"stopped_in_*" flags).
     bool EnteredCD()  const { return fEnteredCD; }
     bool EnteredCsI() const { return fEnteredCsI; }
     bool EnteredACD() const { return fEnteredACD; }
+    bool EnteredPD()  const { return fEnteredPD; }
+    bool LeftCD()     const { return fLeftCD; }
     bool LeftCsI()    const { return fLeftCsI; }
+    bool LeftACD()    const { return fLeftACD; }
+    bool LeftPD()     const { return fLeftPD; }
 
   private:
     struct Row {
@@ -54,13 +63,22 @@ class EventAction : public G4UserEventAction {
 
     std::vector<Row> fRows;  // all interactions (incl. photons) for the detail file
 
-    // Proton interaction summary (for the index; photons excluded).
-    bool fEnteredCD  = false, fEnteredCsI = false, fEnteredACD = false;
+    // Proton interaction summary (for the index; photons excluded). "PD"
+    // here is the proton's own direct passage through the photodiode
+    // silicon -- distinct from RecordPhoton()'s optical detections.
+    bool fEnteredCD  = false, fEnteredCsI = false, fEnteredACD = false, fEnteredPD = false;
+    bool fLeftCD     = false, fStoppedCD  = false;
     bool fLeftCsI    = false, fStoppedCsI = false;
+    bool fLeftACD    = false, fStoppedACD = false;
+    bool fLeftPD     = false, fStoppedPD  = false;
     G4double fTEnterCD = 0.,  fKeEnterCD  = 0.;
+    G4double fTLeaveCD = 0.,  fKeLeaveCD  = 0.;
     G4double fTEnterCsI = 0., fKeEnterCsI = 0.;
     G4double fTLeaveCsI = 0., fKeLeaveCsI = 0.;
     G4double fTEnterACD = 0., fKeEnterACD = 0.;
+    G4double fTLeaveACD = 0., fKeLeaveACD = 0.;
+    G4double fTEnterPD = 0.,  fKeEnterPD  = 0.;
+    G4double fTLeavePD = 0.,  fKeLeavePD  = 0.;
 };
 
 #endif

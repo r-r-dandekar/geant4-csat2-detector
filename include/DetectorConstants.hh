@@ -45,10 +45,32 @@ constexpr G4double kCrossSectionY = 1.0 * cm;
 // Longitudinal (z) thicknesses of each element, in beam order.
 // ---------------------------------------------------------------------------
 constexpr G4double kAluminiumLength          = 0.065 * cm;  // window: stops protons < ~10 MeV
-constexpr G4double kSiliconCoincidenceLength  = 0.178 * cm;  // Si C.D.
+
+// Si C.D. / Si A.C.D. thickness = 0.03cm (300um), matching decision 2 and the
+// decision-27 "dimensions to preserve exactly" list in 003-decisions.md,
+// which the code had drifted away from (it had 0.178cm/1.78mm here instead)
+// -- this restores the already-decided value, it is not a new one.
+//
+// ASSUMPTION (photocurrent-modeling work, see conversation history): C.D.,
+// A.C.D., and the photodiode are the same physical PIN photodiode part. Its
+// datasheet gives a full packaged thickness (silicon die + plastic casing) of
+// 1.78mm -- evidently the source of the stale 0.178cm value above -- but a
+// depletion-layer thickness of only 300um at the intended 70V operating bias.
+// PIN diodes are designed so their (lightly-doped) active region is
+// essentially fully depleted at rated bias, so 300um is taken to be the
+// part's entire photosensitive silicon thickness; the rest of the 1.78mm
+// package is non-silicon casing/backing material. Per an explicit decision,
+// that casing is NOT modelled separately (no extra material/volume for it);
+// C.D. and A.C.D. are simply modelled as 300um of silicon, matching the
+// photodiode (kPhotodiodeLength below). The stale 0.178cm value overstated
+// real proton energy deposition/charge generation by treating the whole
+// package as bulk silicon.
+// Re-run any existing sweeps/timelogs after this change -- old CD/ACD edep
+// data was generated under the previous (thicker) geometry.
+constexpr G4double kSiliconCoincidenceLength  = 0.03 * cm;  // Si C.D.
 constexpr G4double kEmptyPassageLength        = 5.0  * cm;  // vacuum drift gap
 constexpr G4double kCsILength                 = 3.3  * cm;  // CsI(Tl) scintillator
-constexpr G4double kSiliconAnticoincidenceLength = 0.178 * cm;  // Si A.C.D.
+constexpr G4double kSiliconAnticoincidenceLength = 0.03 * cm;  // Si A.C.D.
 constexpr G4double kPhotodiodeLength          = 0.03 * cm;  // photodiode (300 um)
 
 // ---------------------------------------------------------------------------

@@ -39,9 +39,13 @@ void EventAction::BeginOfEventAction(const G4Event*) { Reset(); }
 
 void EventAction::Reset() {
     fRows.clear();
-    fEnteredCD = fEnteredCsI = fEnteredACD = fLeftCsI = fStoppedCsI = false;
-    fTEnterCD = fKeEnterCD = fTEnterCsI = fKeEnterCsI = 0.;
-    fTLeaveCsI = fKeLeaveCsI = fTEnterACD = fKeEnterACD = 0.;
+    fEnteredCD = fEnteredCsI = fEnteredACD = fEnteredPD = false;
+    fLeftCD = fStoppedCD = fLeftCsI = fStoppedCsI = false;
+    fLeftACD = fStoppedACD = fLeftPD = fStoppedPD = false;
+    fTEnterCD = fKeEnterCD = fTLeaveCD = fKeLeaveCD = 0.;
+    fTEnterCsI = fKeEnterCsI = fTLeaveCsI = fKeLeaveCsI = 0.;
+    fTEnterACD = fKeEnterACD = fTLeaveACD = fKeLeaveACD = 0.;
+    fTEnterPD = fKeEnterPD = fTLeavePD = fKeLeavePD = 0.;
 }
 
 //....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
@@ -61,9 +65,29 @@ void EventAction::RecordProtonEnterACD(G4double t, G4double ke) {
     fRows.push_back({t, "enter_ACD", "proton", ke});
 }
 
+void EventAction::RecordProtonLeaveCD(G4double t, G4double ke, bool stopped) {
+    fLeftCD = true; fStoppedCD = stopped; fTLeaveCD = t; fKeLeaveCD = ke;
+    fRows.push_back({t, stopped ? "stop_CD" : "exit_CD", "proton", ke});
+}
+
 void EventAction::RecordProtonLeaveCsI(G4double t, G4double ke, bool stopped) {
     fLeftCsI = true; fStoppedCsI = stopped; fTLeaveCsI = t; fKeLeaveCsI = ke;
     fRows.push_back({t, stopped ? "stop_CsI" : "exit_CsI", "proton", ke});
+}
+
+void EventAction::RecordProtonLeaveACD(G4double t, G4double ke, bool stopped) {
+    fLeftACD = true; fStoppedACD = stopped; fTLeaveACD = t; fKeLeaveACD = ke;
+    fRows.push_back({t, stopped ? "stop_ACD" : "exit_ACD", "proton", ke});
+}
+
+void EventAction::RecordProtonEnterPD(G4double t, G4double ke) {
+    fEnteredPD = true; fTEnterPD = t; fKeEnterPD = ke;
+    fRows.push_back({t, "enter_PD", "proton", ke});
+}
+
+void EventAction::RecordProtonLeavePD(G4double t, G4double ke, bool stopped) {
+    fLeftPD = true; fStoppedPD = stopped; fTLeavePD = t; fKeLeavePD = ke;
+    fRows.push_back({t, stopped ? "stop_PD" : "exit_PD", "proton", ke});
 }
 
 void EventAction::RecordPhoton(G4double t, G4double e) {
@@ -132,26 +156,35 @@ void EventAction::AppendIndexRow(const G4String& detailFileName,
 
     if (needHeader) {
         out << "event_id,file,energy_MeV,"
-            << "entered_CD,entered_CsI,entered_ACD,stopped_in_CsI,"
-            << "t_enter_CD_ns,ke_enter_CD_MeV,"
-            << "t_enter_CsI_ns,ke_enter_CsI_MeV,"
-            << "t_leave_CsI_ns,ke_leave_CsI_MeV,"
-            << "t_enter_ACD_ns,ke_enter_ACD_MeV\n";
+            << "entered_CD,stopped_in_CD,entered_CsI,stopped_in_CsI,"
+            << "entered_ACD,stopped_in_ACD,entered_PD,stopped_in_PD,"
+            << "t_enter_CD_ns,ke_enter_CD_MeV,t_leave_CD_ns,ke_leave_CD_MeV,"
+            << "t_enter_CsI_ns,ke_enter_CsI_MeV,t_leave_CsI_ns,ke_leave_CsI_MeV,"
+            << "t_enter_ACD_ns,ke_enter_ACD_MeV,t_leave_ACD_ns,ke_leave_ACD_MeV,"
+            << "t_enter_PD_ns,ke_enter_PD_MeV,t_leave_PD_ns,ke_leave_PD_MeV\n";
     }
 
-    out << eventID << "," << detailFileName << "," << cfg::gPrimaryEnergy / MeV
-        << "," << (fEnteredCD ? 1 : 0) << "," << (fEnteredCsI ? 1 : 0)
-        << "," << (fEnteredACD ? 1 : 0) << "," << (fStoppedCsI ? 1 : 0) << ",";
+    out << eventID << "," << detailFileName << "," << cfg::gPrimaryEnergy / MeV << ","
+        << (fEnteredCD  ? 1 : 0) << "," << (fStoppedCD  ? 1 : 0) << ","
+        << (fEnteredCsI ? 1 : 0) << "," << (fStoppedCsI ? 1 : 0) << ","
+        << (fEnteredACD ? 1 : 0) << "," << (fStoppedACD ? 1 : 0) << ","
+        << (fEnteredPD  ? 1 : 0) << "," << (fStoppedPD  ? 1 : 0) << ",";
 
     // Optional proton-interaction columns: value if it happened, else blank.
-    const std::pair<bool, G4double> opt[8] = {
+    // Energy deposited in an element = ke_enter - ke_leave (ke_leave is 0 when
+    // the proton stopped inside, so this also covers the full-deposit case).
+    const std::pair<bool, G4double> opt[16] = {
         {fEnteredCD,  fTEnterCD},  {fEnteredCD,  fKeEnterCD},
+        {fLeftCD,     fTLeaveCD},  {fLeftCD,     fKeLeaveCD},
         {fEnteredCsI, fTEnterCsI}, {fEnteredCsI, fKeEnterCsI},
         {fLeftCsI,    fTLeaveCsI}, {fLeftCsI,    fKeLeaveCsI},
         {fEnteredACD, fTEnterACD}, {fEnteredACD, fKeEnterACD},
+        {fLeftACD,    fTLeaveACD}, {fLeftACD,    fKeLeaveACD},
+        {fEnteredPD,  fTEnterPD},  {fEnteredPD,  fKeEnterPD},
+        {fLeftPD,     fTLeavePD},  {fLeftPD,     fKeLeavePD},
     };
-    for (int i = 0; i < 8; ++i) {
+    for (int i = 0; i < 16; ++i) {
         if (opt[i].first) out << opt[i].second;
-        out << (i < 7 ? "," : "\n");
+        out << (i < 15 ? "," : "\n");
     }
 }
