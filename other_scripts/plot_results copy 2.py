@@ -1,0 +1,346 @@
+#!/usr/bin/env python3
+"""
+Generate diagnostic plots from consolidated proton+photon event CSV.
+
+Plots produced:
+  1. photon_wavelength_distribution.png    – histogram of photon wavelengths (nm)
+  2. proton_energy_distribution.png        – histogram of proton energies (MeV)
+  3. photon_spikes_first20ns.png           – per-photon energy spike vs time (first 20 ns)
+  4. spenvis_integral_flux.png             – cumulative flux F(>E) from CSV vs SPENVIS reference
+  5. spenvis_differential_flux.png         – differential flux per SPENVIS bin from CSV vs reference
+
+Usage:
+    python plot_results.py [consolidated.csv] [--duration-ms 1000] [--output-dir plots]
+
+Requirements:
+    pip install numpy pandas matplotlib
+"""
+
+import argparse
+import sys
+from pathlib import Path
+
+import matplotlib
+matplotlib.use('Agg')  # non-interactive backend; safe on headless machines
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+import numpy as np
+import pandas as pd
+
+# hc in eV·nm  →  wavelength (nm) = HC_EV_NM / energy_eV
+HC_EV_NM = 1239.84193
+
+# ── SPENVIS AP-8 MAX integral flux table (from PDF) ──────────────────────────
+# Columns: [Energy (MeV), F(>E) in protons/cm²/s]
+SPENVIS_INTEGRAL = np.array([
+    [0.10,  3.8294e8],
+    [0.15,  3.3116e8],
+    [0.20,  2.8638e8],
+    [0.30,  2.0975e8],
+    [0.40,  1.5732e8],
+    [0.50,  1.2044e8],
+    [0.60,  9.4488e7],
+    [0.70,  7.5659e7],
+    [1.00,  4.0934e7],
+    [1.50,  1.6920e7],
+    [2.00,  7.6911e6],
+    [3.00,  3.7001e6],
+    [4.00,  2.2613e6],
+    [5.00,  1.6053e6],
+    [6.00,  1.1414e6],
+    [7.00,  8.1643e5],
+    [10.00, 3.3740e5],
+    [15.00, 1.0887e5],
+    [20.00, 5.8697e4],
+    [30.00, 3.5262e4],
+    [40.00, 2.8124e4],
+    [50.00, 2.2430e4],
+    [60.00, 1.9687e4],
+    [70.00, 1.7598e4],
+    [100.0, 1.2569e4],
+    [150.0, 7.2268e3],
+    [200.0, 4.1552e3],
+    [300.0, 1.5344e3],
+    [400.0, 5.7500e2],
+])
+
+
+def _loglog_interp(E: np.ndarray) -> np.ndarray:
+    """Log-log interpolate SPENVIS integral flux at arbitrary energies."""
+    return np.exp(np.interp(
+        np.log(E),
+        np.log(SPENVIS_INTEGRAL[:, 0]),
+        np.log(SPENVIS_INTEGRAL[:, 1]),
+    ))
+
+
+def energy_MeV_to_wavelength_nm(energy_MeV: np.ndarray) -> np.ndarray:
+    return HC_EV_NM / (energy_MeV * 1e6)
+
+
+def load_data(csv_path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
+    print(f"Loading {csv_path} ...")
+    df = pd.read_csv(csv_path)
+
+    # Two consolidation pipelines exist with different column names:
+    # generate_timeseries.py's consolidated.csv uses 'time_ns'/'energy_MeV';
+    # sweep_consolidate.py's output uses 'time'/'energy' instead. Normalize to
+    # the former (what the rest of this script expects) so either works.
+    rename_map = {}
+    if 'time_ns' not in df.columns and 'time' in df.columns:
+        rename_map['time'] = 'time_ns'
+    if 'energy_MeV' not in df.columns and 'energy' in df.columns:
+        rename_map['energy'] = 'energy_MeV'
+    if rename_map:
+        df = df.rename(columns=rename_map)
+
+    protons = df[df['particle'] == 'proton'].copy()
+    photons = df[df['particle'] == 'opticalphoton'].copy()
+    print(f"  {len(protons):,} proton rows, {len(photons):,} photon rows")
+    return protons, photons
+
+
+# ── Plot 1: Photon wavelength distribution ───────────────────────────────────
+
+def plot_wavelength_distribution(photons: pd.DataFrame, out_path: Path) -> None:
+    wavelengths = energy_MeV_to_wavelength_nm(photons['energy_MeV'].to_numpy())
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+    n, bins, patches = ax.hist(wavelengths, bins=100, color='steelblue', edgecolor='none')
+
+    for patch, left in zip(patches, bins[:-1]):
+        if 380 <= left <= 700:
+            patch.set_facecolor(wavelength_to_rgb(left))
+        else:
+            patch.set_facecolor('mediumpurple' if left < 380 else 'darkred')
+
+    ax.set_xlabel('Wavelength (nm)', fontsize=12)
+    ax.set_ylabel('Count', fontsize=12)
+    ax.set_title('Distribution of Optical Photon Wavelengths', fontsize=13)
+    ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())
+    ax.yaxis.set_minor_locator(ticker.AutoMinorLocator())
+    ax.grid(axis='y', alpha=0.3)
+
+    wl_mean = float(np.mean(wavelengths))
+    ax.axvline(wl_mean, color='black', linestyle='--', linewidth=1,
+               label=f'Mean: {wl_mean:.1f} nm')
+    ax.legend(fontsize=10)
+
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    print(f"  Saved: {out_path}")
+
+
+# ── Plot 2: Proton energy distribution ──────────────────────────────────────
+
+def plot_proton_energy_distribution(protons: pd.DataFrame, out_path: Path) -> None:
+    energies = protons['energy_MeV'].to_numpy()
+    unique_e = np.unique(energies)
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    if len(unique_e) <= 30:
+        counts = {e: int(np.sum(energies == e)) for e in unique_e}
+        ax.bar(list(counts.keys()), list(counts.values()),
+               width=np.min(np.diff(unique_e)) * 0.6 if len(unique_e) > 1 else 1,
+               color='tomato', edgecolor='none')
+        ax.set_xticks(unique_e)
+        ax.set_xticklabels([f'{e:g}' for e in unique_e], rotation=45, ha='right', fontsize=8)
+    else:
+        ax.hist(energies, bins=60, color='tomato', edgecolor='none')
+
+    ax.set_xlabel('Proton Energy (MeV)', fontsize=12)
+    ax.set_ylabel('Count', fontsize=12)
+    ax.set_title('Distribution of Proton Energies', fontsize=13)
+    ax.yaxis.set_minor_locator(ticker.AutoMinorLocator())
+    ax.grid(axis='y', alpha=0.3)
+
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    print(f"  Saved: {out_path}")
+
+
+# ── Plot 3: Photon energy spikes – first N ns ────────────────────────────────
+
+def plot_photon_spikes(photons: pd.DataFrame, out_path: Path,
+                       window_ns: float = 20.0) -> None:
+    early = photons[photons['time_ns'] <= window_ns]
+
+    if early.empty:
+        print(f"  WARNING: no photons found in first {window_ns} ns – skipping spike plot.")
+        return
+
+    t    = early['time_ns'].to_numpy()
+    e_eV = early['energy_MeV'].to_numpy() * 1e6   # MeV → eV
+
+    fig, ax = plt.subplots(figsize=(12, 5))
+    ax.vlines(t, ymin=0, ymax=e_eV, linewidth=0.8, color='darkorange', alpha=0.7)
+    ax.set_xlim(0, window_ns)
+    ax.set_ylim(bottom=0)
+    ax.set_xlabel('Time (ns)', fontsize=12)
+    ax.set_ylabel('Photon Energy (eV)', fontsize=12)
+    ax.set_title(f'Optical Photon Arrivals – First {window_ns} ns', fontsize=13)
+    ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())
+    ax.yaxis.set_minor_locator(ticker.AutoMinorLocator())
+    ax.grid(axis='y', alpha=0.3)
+    ax.annotate(f'{len(early):,} photons in window', xy=(0.98, 0.96),
+                xycoords='axes fraction', ha='right', va='top', fontsize=9,
+                color='dimgray')
+
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    print(f"  Saved: {out_path}")
+
+
+# ── Plot 4: Integral (cumulative) flux ──────────────────────────────────────
+
+def plot_spenvis_integral(protons: pd.DataFrame, duration_s: float,
+                          out_path: Path) -> None:
+    energies = protons['energy_MeV'].to_numpy()
+    E_edges  = SPENVIS_INTEGRAL[:, 0]   # use exact SPENVIS energy thresholds
+    F_ref    = SPENVIS_INTEGRAL[:, 1]
+
+    # Measured: count protons with energy > E, normalised to flux
+    F_meas = np.array([(energies > E).sum() / duration_s for E in E_edges])
+
+    # Reference interpolated curve (full range)
+    E_curve = np.logspace(np.log10(E_edges[0]), np.log10(E_edges[-1]), 500)
+    F_curve = _loglog_interp(E_curve)
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+
+    ax.plot(E_curve, F_curve, color='steelblue', linewidth=1.5, linestyle='--',
+            alpha=0.7, label='SPENVIS AP-8 MAX (reference)')
+    ax.scatter(E_edges, F_ref, color='steelblue', s=35, zorder=4,
+               label='SPENVIS tabulated points')
+    ax.scatter(E_edges, F_meas, color='tomato', s=35, zorder=5, marker='D',
+               label='Measured from consolidated CSV')
+
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.set_xlabel('Proton Energy  E  (MeV)', fontsize=12)
+    ax.set_ylabel('Integral flux  F(>E)  (protons / cm² / s)', fontsize=12)
+    ax.set_title('Cumulative Proton Flux — Measured vs SPENVIS AP-8 MAX', fontsize=13)
+    ax.grid(True, which='both', alpha=0.25)
+    ax.legend(fontsize=9)
+
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    print(f"  Saved: {out_path}")
+
+
+# ── Plot 5: Differential flux ────────────────────────────────────────────────
+
+def plot_spenvis_differential(protons: pd.DataFrame, duration_s: float,
+                              out_path: Path) -> None:
+    energies = protons['energy_MeV'].to_numpy()
+    E   = SPENVIS_INTEGRAL[:, 0]
+    F   = SPENVIS_INTEGRAL[:, 1]
+
+    # Reference: consecutive differences of tabulated integral flux
+    F_ref_diff = F[:-1] - F[1:]
+
+    # Measured: protons in [E_i, E_{i+1}) / duration
+    F_meas_diff = np.array([
+        ((energies >= E[i]) & (energies < E[i + 1])).sum() / duration_s
+        for i in range(len(E) - 1)
+    ])
+
+    labels = [f'{E[i]:g}–{E[i+1]:g}' for i in range(len(E) - 1)]
+    x     = np.arange(len(labels))
+    width = 0.4
+
+    fig, ax = plt.subplots(figsize=(16, 5))
+
+    ax.bar(x - width / 2, F_ref_diff,  width, color='steelblue', alpha=0.75,
+           label='SPENVIS AP-8 MAX (reference)')
+    ax.bar(x + width / 2, F_meas_diff, width, color='tomato',    alpha=0.85,
+           label='Measured from consolidated CSV')
+
+    ax.set_yscale('log')
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=45, ha='right', fontsize=7)
+    ax.set_xlabel('Proton Energy Bin (MeV)', fontsize=12)
+    ax.set_ylabel('Differential flux  (protons / cm² / s)', fontsize=12)
+    ax.set_title('Differential Proton Flux — Measured vs SPENVIS AP-8 MAX', fontsize=13)
+    ax.grid(axis='y', which='both', alpha=0.25)
+    ax.legend(fontsize=9)
+
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    print(f"  Saved: {out_path}")
+
+
+# ── Utility: wavelength (nm) → approximate sRGB ──────────────────────────────
+
+def wavelength_to_rgb(wl: float) -> tuple[float, float, float]:
+    if   380 <= wl < 440: r, g, b = (440 - wl) / 60, 0.0, 1.0
+    elif 440 <= wl < 490: r, g, b = 0.0, (wl - 440) / 50, 1.0
+    elif 490 <= wl < 510: r, g, b = 0.0, 1.0, (510 - wl) / 20
+    elif 510 <= wl < 580: r, g, b = (wl - 510) / 70, 1.0, 0.0
+    elif 580 <= wl < 645: r, g, b = 1.0, (645 - wl) / 65, 0.0
+    elif 645 <= wl <= 700: r, g, b = 1.0, 0.0, 0.0
+    else:                  r, g, b = 0.5, 0.5, 0.5
+    factor = (0.3 + 0.7 * (wl - 380) / 60  if 380 <= wl < 440 else
+              0.3 + 0.7 * (700 - wl) / 55   if 645 < wl <= 700 else 1.0)
+    return (r * factor, g * factor, b * factor)
+
+
+# ── Entry point ──────────────────────────────────────────────────────────────
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description='Plot proton/photon statistics from consolidated CSV.'
+    )
+    parser.add_argument('csv', type=Path, nargs='?', default=Path('consolidated.csv'),
+                        help='Path to consolidated CSV (default: consolidated.csv)')
+    parser.add_argument('--duration-ms', type=float, default=1000.0,
+                        help='Simulation window duration in ms — used to normalise flux (default: 1000)')
+    parser.add_argument('--output-dir', type=Path, default=Path('plots'),
+                        help='Directory for output images (default: plots/)')
+    parser.add_argument('--spike-window-ns', type=float, default=20.0,
+                        help='Time window for spike plot in ns (default: 20)')
+    args = parser.parse_args()
+
+    if not args.csv.exists():
+        sys.exit(f"ERROR: {args.csv} not found.")
+
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    duration_s = args.duration_ms / 1000.0
+
+    protons, photons = load_data(args.csv)
+
+    print("\nGenerating plots ...")
+
+    plot_wavelength_distribution(
+        photons,
+        args.output_dir / 'photon_wavelength_distribution.png',
+    )
+    plot_proton_energy_distribution(
+        protons,
+        args.output_dir / 'proton_energy_distribution.png',
+    )
+    plot_photon_spikes(
+        photons,
+        args.output_dir / 'photon_spikes_first20ns.png',
+        window_ns=args.spike_window_ns,
+    )
+    plot_spenvis_integral(
+        protons, duration_s,
+        args.output_dir / 'spenvis_integral_flux.png',
+    )
+    plot_spenvis_differential(
+        protons, duration_s,
+        args.output_dir / 'spenvis_differential_flux.png',
+    )
+
+    print(f"\nAll plots saved to: {args.output_dir.resolve()}")
+
+
+if __name__ == '__main__':
+    main()
