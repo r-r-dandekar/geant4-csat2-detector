@@ -50,3 +50,6 @@ sweep_*.mac
 # --- OS ---
 .DS_Store
 Thumbs.db
+
+# Results (they can be very big in size, so shouldn't be pushed to git)
+results/

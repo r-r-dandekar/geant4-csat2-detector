@@ -4,8 +4,8 @@
 # per energy to a single CSV. The simulation program owns the CSV header, so
 # this script only has to start a fresh file and loop.
 #
-# Run from the build directory (where the `dsim` executable lives):
-#   bash ../scripts/run_sweep.sh results/sweep.csv [nevents] [ydiv] [mode] [timelog_dir]
+# Run from the BUILD DIRECTORY (where the `dsim` executable lives):
+#   bash ../scripts/run_sweep.sh results/$SUBDIR/sweep.csv [nevents] [ydiv] [mode] [timelog_dir]
 #
 #   <output.csv>   required - path to the aggregate results CSV
 #   [nevents]      protons per energy (default 500)
@@ -13,6 +13,9 @@
 #   [mode]         ideal | realistic (default ideal)
 #   [timelog_dir]  if given, also write per-proton time-log files into this
 #                  folder, using a per-energy run tag (one index per energy)
+
+# EXAMPLE USAGE:
+# bash ../scripts/run_sweep.sh ../results/$SUBDIR/sweep.csv 10000 10000 realistic ../results/$SUBDIR/timelogs
 
 set -e
 

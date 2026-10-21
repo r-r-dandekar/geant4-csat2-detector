@@ -235,8 +235,6 @@ Geometry DetectorConstruction::BuildPhotodiode(G4LogicalVolume* mother) {
                  kCsILength / 2.0 };
     g.physical = Place(centre, g.logical, kPhotodiodeName, mother);
 
-    BuildPhotodiodeTeflonCoating(mother);
-
     // Magenta so the side-mounted photodiode is easy to pick out from the
     // (blue) silicon detectors during the visual check.
     g.logical->SetVisAttributes(new G4VisAttributes(G4Colour(1.0, 0.0, 1.0, 0.7)));
@@ -280,38 +278,6 @@ G4VPhysicalVolume* DetectorConstruction::BuildCsITeflonCoating(
 
     logical->SetVisAttributes(new G4VisAttributes(G4Colour(0.3, 0.3, 0.3, 0.3)));
     return physical;
-}
-
-void DetectorConstruction::BuildPhotodiodeTeflonCoating(G4LogicalVolume* mother) {
-    const G4double t = kTeflonThicknessPhotodiode;
-
-    G4Box* outer = MakeBox("pd_teflon_outer",
-                           { kCrossSectionX, kPhotodiodeLength, kCrossSectionY });
-    G4Box* inner = MakeBox("pd_teflon_inner",
-                           { kCrossSectionX   - 2.0 * t,
-                             kPhotodiodeLength - 2.0 * t,
-                             kCrossSectionY   - 2.0 * t });
-
-    auto* shell = new G4SubtractionSolid("pd_teflon_shell", outer, inner);
-
-    // Carve a matching window out of the -y wall (the face toward the CsI) so
-    // the photodiode wrap does not re-block the light let through by the CsI
-    // window.
-    G4Box* window = MakeBox("pd_teflon_window",
-                            { kCouplingWindowX, 4.0 * t, kCouplingWindowZ });
-    auto* shellWithWindow =
-        new G4SubtractionSolid(kTeflonPhotodiodeName, shell, window, nullptr,
-                               G4ThreeVector(0.0, -kPhotodiodeLength / 2.0, 0.0));
-
-    auto* logical = new G4LogicalVolume(shellWithWindow, MaterialTeflon(),
-                                        kTeflonPhotodiodeName);
-
-    Place({ kOriginX,
-            kCrossSectionY / 2.0 + kPhotodiodeLength / 2.0,
-            kCsILength / 2.0 },
-          logical, kTeflonPhotodiodeName, mother);
-
-    logical->SetVisAttributes(new G4VisAttributes(G4Colour(0.5, 0.5, 0.5, 0.4)));
 }
 
 //....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......

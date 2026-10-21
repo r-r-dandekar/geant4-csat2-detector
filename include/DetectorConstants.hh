@@ -76,10 +76,10 @@ constexpr G4double kPhotodiodeLength          = 0.03 * cm;  // photodiode (300 u
 // ---------------------------------------------------------------------------
 // Teflon reflective wrapping.
 // ---------------------------------------------------------------------------
-constexpr G4double kTeflonThicknessCsI        = 0.01 * cm;  // wrap on CsI -- resolved to 0.01 cm (decision 3)
+constexpr G4double kTeflonThicknessCsI        = 0.01 * cm;  // wrap on CsI -- assumed to be 0.01 cm
 constexpr G4double kTeflonThicknessPhotodiode = 0.005 * cm; // wrap on photodiode
 
-// Optical coupling window aperture in the teflon (decision 5): the patch of
+// Optical coupling window aperture in the teflon: the patch of
 // teflon between the CsI and the photodiode is opened so scintillation light
 // can reach the photodiode. Sized to the photodiode's facing footprint.
 constexpr G4double kCouplingWindowX = kCrossSectionX - 2.0 * kTeflonThicknessPhotodiode;

@@ -1,4 +1,4 @@
-# Python dependencies for the analysis/plotting script (plot_results.py).
 # Install with:  pip install -r requirements.txt
 pandas
 matplotlib
+scipy
