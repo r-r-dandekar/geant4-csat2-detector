@@ -64,7 +64,7 @@ CONV_BLOCK_SIZE = 1 << 18
 
 # --- Output ---
 PLOT_WINDOW_START_NS    = 0      # Start of plot window relative to first photon (ns)
-PLOT_WINDOW_DURATION_NS = 100000   # Duration of plot window (ns) = 2 µs
+PLOT_WINDOW_DURATION_NS = 1000  # Duration of plot window (ns)
 
 PWL_DOWNSAMPLE = 1               # Write every Nth sample to PWL (1 = all points)
 

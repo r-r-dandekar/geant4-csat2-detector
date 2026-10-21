@@ -167,15 +167,44 @@ def main() -> None:
 
     with open(args.output, mode='w', newline='', encoding='utf-8') as outfile:
         writer = csv.writer(outfile)
-        header = ['Energy_MeV', 'Integral_Flux', 'Status']
+        header = ['time_ns', 'particle', 'energy_MeV']
         writer.writerow(header)
         for E_lo, E_hi, n, rep_e, _ in plan:
+            print('Energy level:', rep_e)
             paths = files_by_energy[rep_e]
             for i in range(n):
                 path = random.choice(paths)
-                df = pd.read_csv(path)
-                # TODO: Actually filter consolidate the stuff
+                df = pd.read_csv(path, comment='#')
+                
+                # Randomized particle start time
+                start_time = random.uniform(0, duration_ns)
 
+                # Get the energy of the proton from the file name
+                # Search for the pattern 'E' followed by digits and 'MeV'
+                match = re.search(r"E(\d+(?:\.\d+)?)MeV", str(path))
+                try:
+                    energy_value = float(match.group(1))
+                except:
+                    print('Error in getting energy from path: ', path)
+
+                # Write a row for the proton into the .csv
+                proton_row = [start_time, "proton", energy_value]
+                writer.writerows([proton_row])
+
+
+                # 1. Filter the DataFrame for rows where 'particle' is 'opticalphoton'
+                # Using .copy() prevents SettingWithCopyWarning when modifying the dataframe
+                filtered_df = df[df["particle"] == "opticalphoton"].copy()
+
+                # 2. Add the constant 'k' to the 'time_ns' column for these rows
+                filtered_df["time_ns"] += start_time
+
+                # 3. Select only the required columns: time_ns, particle, and energy_MeV
+                output_data = filtered_df[["time_ns", "particle", "energy_MeV"]]
+
+                # 4. Append the rows to the output CSV file using your existing writer
+                writer.writerows(output_data.to_numpy())
+                
 
 
 
